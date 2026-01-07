@@ -40,7 +40,7 @@ The system supports **real-time messaging**, **private messages**, **file sharin
 
 Before running the project locally:
 
-1. Install **Java Development Kit (JDK) 23** or newer.
+1. Install **Java Development Kit (JDK) 17** or newer.
 2. Install **Maven** for building and running the application.
 
 ---

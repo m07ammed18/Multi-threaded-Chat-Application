@@ -2,16 +2,15 @@ package com.chatapp.ui;
 
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.awt.*;
-import java.awt.PageAttributes.ColorType;
 import java.awt.event.*;
 import java.io.*;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.*;
 import javax.swing.text.*;
 import com.chatapp.server.ChatMessage;
 
@@ -55,7 +54,6 @@ public class ChatFrame extends JFrame {
     // Chat Area
     chatPane = new JTextPane();
     chatPane.setEditable(false);
-    // chatPane.setFont(new Font("SansSerif", Font.PLAIN, 14));
     chatPane.setBackground(BG_COLOR);
     chatPane.setForeground(TEXT_COLOR);
     chatPane.setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -83,17 +81,17 @@ public class ChatFrame extends JFrame {
 
     // Input Behavior: Enter to send, Shift+Enter for new line
     inputField.addKeyListener(new KeyAdapter() {
-    @Override
-    public void keyPressed(KeyEvent e) {
-    if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-    if (e.isShiftDown()) {
-    inputField.append("\n");
-    } else {
-    e.consume();
-    sendMessage();
-    }
-    }
-    }
+      @Override
+      public void keyPressed(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+          if (e.isShiftDown()) {
+            inputField.append("\n");
+          } else {
+            e.consume();
+            sendMessage();
+          }
+        }
+      }
     });
 
     // Buttons Logic
@@ -115,6 +113,24 @@ public class ChatFrame extends JFrame {
     add(new JScrollPane(chatPane), BorderLayout.CENTER);
     add(new JScrollPane(userList), BorderLayout.EAST);
     add(bottom, BorderLayout.SOUTH);
+
+    inputField.getDocument().addDocumentListener(new DocumentListener() {
+      public void insertUpdate(DocumentEvent e) {
+        checkInput();
+      }
+
+      public void removeUpdate(DocumentEvent e) {
+        checkInput();
+      }
+
+      public void changedUpdate(DocumentEvent e) {
+        checkInput();
+      }
+
+      private void checkInput() {
+        SwingUtilities.invokeLater(() -> sendBtn.setEnabled(!inputField.getText().trim().isEmpty()));
+      }
+    });
 
     // Status Bar
     statusLabel = new JLabel("Connecting...");
@@ -169,25 +185,23 @@ public class ChatFrame extends JFrame {
     SwingUtilities.invokeLater(() -> {
       try {
         String timestamp = "[" + timeFormat.format(new Date()) + "] ";
-
-        // Set Alignment
         SimpleAttributeSet alignAttr = new SimpleAttributeSet();
         StyleConstants.setAlignment(alignAttr, alignment);
         int start = doc.getLength();
 
-        // Timestamp Style
+        // Timestamp
         SimpleAttributeSet timeAttr = new SimpleAttributeSet();
         StyleConstants.setForeground(timeAttr, SYSTEM_MSG_COLOR);
         StyleConstants.setItalic(timeAttr, true);
         doc.insertString(doc.getLength(), timestamp, timeAttr);
 
-        // Sender Style
+        // Sender
         SimpleAttributeSet senderAttr = new SimpleAttributeSet();
         StyleConstants.setForeground(senderAttr, color);
         StyleConstants.setBold(senderAttr, true);
         doc.insertString(doc.getLength(), sender + ": ", senderAttr);
 
-        // Content Style
+        // Content
         SimpleAttributeSet contentAttr = new SimpleAttributeSet();
         StyleConstants.setForeground(contentAttr, TEXT_COLOR);
         doc.insertString(doc.getLength(), content + "\n", contentAttr);
@@ -219,45 +233,85 @@ public class ChatFrame extends JFrame {
     });
   }
 
-  private void appendText(String text, Color color, boolean bold) {
-    SimpleAttributeSet attrs = new SimpleAttributeSet();
-    StyleConstants.setForeground(attrs, color);
-    StyleConstants.setBold(attrs, bold);
-    try {
-      doc.insertString(doc.getLength(), text + "\n", attrs);
-    } catch (BadLocationException e) {
-      e.printStackTrace();
-    }
+  private void appendImage(byte[] imageData, String sender, int alignment, Color senderColor) {
+    SwingUtilities.invokeLater(() -> {
+      try {
+        String timestamp = "[" + timeFormat.format(new Date()) + "] ";
+        SimpleAttributeSet alignAttr = new SimpleAttributeSet();
+        StyleConstants.setAlignment(alignAttr, alignment);
+        int start = doc.getLength();
+
+        // Timestamp
+        SimpleAttributeSet timeAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(timeAttr, SYSTEM_MSG_COLOR);
+        StyleConstants.setItalic(timeAttr, true);
+        doc.insertString(doc.getLength(), timestamp, timeAttr);
+
+        // Sender
+        SimpleAttributeSet senderAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(senderAttr, senderColor);
+        StyleConstants.setBold(senderAttr, true);
+        doc.insertString(doc.getLength(), sender + " sent an image:\n", senderAttr);
+
+        // Image
+        ImageIcon icon = new ImageIcon(imageData);
+        Image img = icon.getImage();
+        int width = img.getWidth(null);
+        int height = img.getHeight(null);
+        if (width > 300) {
+          double ratio = 300.0 / width;
+          img = img.getScaledInstance(300, (int) (height * ratio), Image.SCALE_SMOOTH);
+          icon = new ImageIcon(img);
+        }
+
+        chatPane.setCaretPosition(doc.getLength());
+        chatPane.insertIcon(icon);
+        doc.insertString(doc.getLength(), "\n", null);
+
+        doc.setParagraphAttributes(start, doc.getLength() - start, alignAttr, false);
+        chatPane.setCaretPosition(doc.getLength());
+      } catch (BadLocationException e) {
+        e.printStackTrace();
+      }
+    });
   }
 
-  private void appendImage(byte[] imageData, String sender) {
-    if (sender == "Me") {
-      appendMessage(sender, sender + " sent an image:", MY_MSG_COLOR, StyleConstants.ALIGN_RIGHT);
-    }
-    else {
-      appendMessage(sender, sender + " sent an image:", MY_MSG_COLOR, StyleConstants.ALIGN_LEFT);
-    }
-    
-    ImageIcon icon = new ImageIcon(imageData);
+  private void appendFileDownload(ChatMessage msg, int alignment, Color senderColor) {
+    SwingUtilities.invokeLater(() -> {
+      try {
+        String timestamp = "[" + timeFormat.format(new Date()) + "] ";
+        SimpleAttributeSet alignAttr = new SimpleAttributeSet();
+        StyleConstants.setAlignment(alignAttr, alignment);
+        int start = doc.getLength();
 
-    // Reduce the image size if it is too large.
-    Image img = icon.getImage();
-    int width = img.getWidth(null);
-    int height = img.getHeight(null);
-    if (width > 300) {
-      double ratio = 300.0 / width;
-      img = img.getScaledInstance(300, (int) (height * ratio), Image.SCALE_SMOOTH);
-      icon = new ImageIcon(img);
-    }
+        // Timestamp
+        SimpleAttributeSet timeAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(timeAttr, SYSTEM_MSG_COLOR);
+        StyleConstants.setItalic(timeAttr, true);
+        doc.insertString(doc.getLength(), timestamp, timeAttr);
 
-    chatPane.setCaretPosition(doc.getLength());
-    chatPane.insertIcon(icon);
-    
-    try {
-      doc.insertString(doc.getLength(), "\n", null);
-    } catch (BadLocationException e) {
-      e.printStackTrace();
-    }
+        // Sender
+        SimpleAttributeSet senderAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(senderAttr, senderColor);
+        StyleConstants.setBold(senderAttr, true);
+        doc.insertString(doc.getLength(), msg.getSender() + " sent a file: " + msg.getFileName() + " ", senderAttr);
+
+        // Download Button
+        Icon downloadIcon = new FlatSVGIcon("icons/downloadBtn.svg", 12, 12);
+        JButton downloadBtn = new JButton(downloadIcon);
+        downloadBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        downloadBtn.addActionListener(e -> saveFile(msg));
+
+        chatPane.setCaretPosition(doc.getLength());
+        chatPane.insertComponent(downloadBtn);
+
+        doc.insertString(doc.getLength(), "\n", null);
+        doc.setParagraphAttributes(start, doc.getLength() - start, alignAttr, false);
+        chatPane.setCaretPosition(doc.getLength());
+      } catch (BadLocationException e) {
+        e.printStackTrace();
+      }
+    });
   }
 
   private void connectToServer(String host, int port) {
@@ -301,16 +355,16 @@ public class ChatFrame extends JFrame {
       String fileName = msg.getFileName().toLowerCase();
       if (fileName.endsWith(".jpg") || fileName.endsWith(".png") || fileName.endsWith(".gif")
           || fileName.endsWith(".jpeg")) {
-        SwingUtilities.invokeLater(() -> appendImage(msg.getFileData(), msg.getSender()));
-        
+        appendImage(msg.getFileData(), msg.getSender(), StyleConstants.ALIGN_LEFT, OTHER_MSG_COLOR);
       } else {
-        SwingUtilities.invokeLater(() -> {
-          appendText(msg.getSender() + " sent a file: " + msg.getFileName(), Color.MAGENTA, true);
-          saveFile(msg);
-        });
+        appendFileDownload(msg, StyleConstants.ALIGN_LEFT, OTHER_MSG_COLOR);
       }
     } else {
-      SwingUtilities.invokeLater(() -> appendText(msg.getSender() + ": " + msg.getContent(), Color.WHITE, false));
+      if (msg.getSender().equals("Server")) {
+        appendSystemMessage(msg.getContent());
+      } else {
+        appendMessage(msg.getSender(), msg.getContent(), OTHER_MSG_COLOR, StyleConstants.ALIGN_LEFT);
+      }
     }
   }
 
@@ -358,10 +412,9 @@ public class ChatFrame extends JFrame {
         String fileName = file.getName().toLowerCase();
         if (fileName.endsWith(".jpg") || fileName.endsWith(".png") || fileName.endsWith(".gif")
             || fileName.endsWith(".jpeg")) {
-          appendImage(data, "Me");
+          appendImage(data, "Me", StyleConstants.ALIGN_RIGHT, MY_MSG_COLOR);
         } else {
-          appendMessage("Me", file.getName(), Color.lightGray, StyleConstants.ALIGN_RIGHT);
-          // appendText("Me: Sent file " + file.getName(), Color.lightGray, false);
+          appendFileDownload(msg, StyleConstants.ALIGN_RIGHT, MY_MSG_COLOR);
         }
       } catch (IOException e) {
         e.printStackTrace();
@@ -370,17 +423,14 @@ public class ChatFrame extends JFrame {
   }
 
   private void saveFile(ChatMessage msg) {
-    int choice = JOptionPane.showConfirmDialog(this, "Download file " + msg.getFileName() + "?");
-    if (choice == JOptionPane.YES_OPTION) {
-      JFileChooser chooser = new JFileChooser();
-      chooser.setSelectedFile(new File(msg.getFileName()));
-      if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-        try (FileOutputStream fos = new FileOutputStream(chooser.getSelectedFile())) {
-          fos.write(msg.getFileData());
-          JOptionPane.showMessageDialog(this, "File saved!");
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
+    JFileChooser chooser = new JFileChooser();
+    chooser.setSelectedFile(new File(msg.getFileName()));
+    if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+      try (FileOutputStream fos = new FileOutputStream(chooser.getSelectedFile())) {
+        fos.write(msg.getFileData());
+        appendSystemMessage("File '" + msg.getFileName() + "' saved successfully.");
+      } catch (IOException e) {
+        appendSystemMessage("Error saving file: " + e.getMessage());
       }
     }
   }
