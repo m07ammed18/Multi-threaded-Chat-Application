@@ -4,7 +4,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
 import com.chatapp.ui.ChatFrame;
-import com.formdev.flatlaf.FlatIntelliJLaf;
+import com.formdev.flatlaf.*;
 import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 
 public class ClientMain {

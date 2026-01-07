@@ -3,27 +3,38 @@ package com.chatapp.ui;
 import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.awt.*;
 import java.awt.PageAttributes.ColorType;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.io.*;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.text.*;
-
 import com.chatapp.server.ChatMessage;
 
 public class ChatFrame extends JFrame {
   private JTextPane chatPane;
   private StyledDocument doc;
-  private JTextField inputField;
+  private JTextArea inputField;
   private JButton sendBtn, fileBtn;
   private JList<String> userList;
   private DefaultListModel<String> listModel;
+  private JLabel statusLabel;
   private ObjectOutputStream out;
   private ObjectInputStream in;
   private String username;
+  private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
+
+  // Colors for Dark Mode
+  private final Color BG_COLOR = new Color(30, 30, 30);
+  private final Color INPUT_BG = new Color(45, 45, 45);
+  private final Color TEXT_COLOR = new Color(220, 220, 220);
+  private final Color MY_MSG_COLOR = new Color(75, 181, 67);
+  private final Color OTHER_MSG_COLOR = new Color(66, 135, 245);
+  private final Color SYSTEM_MSG_COLOR = new Color(180, 180, 180);
 
   public ChatFrame(String host, int port) {
     this.username = JOptionPane.showInputDialog(this, "Enter your username:", "Login", JOptionPane.PLAIN_MESSAGE);
@@ -36,27 +47,59 @@ public class ChatFrame extends JFrame {
 
   private void setupUI() {
     setTitle("Chat Application - " + username);
-    setSize(800, 600);
+    setSize(900, 650);
     setDefaultCloseOperation(EXIT_ON_CLOSE);
     setLocationRelativeTo(null);
+    getContentPane().setBackground(BG_COLOR);
 
+    // Chat Area
     chatPane = new JTextPane();
     chatPane.setEditable(false);
-    chatPane.setFont(new Font("SansSerif", Font.PLAIN, 14));
+    // chatPane.setFont(new Font("SansSerif", Font.PLAIN, 14));
+    chatPane.setBackground(BG_COLOR);
+    chatPane.setForeground(TEXT_COLOR);
+    chatPane.setBorder(new EmptyBorder(10, 10, 10, 10));
     doc = chatPane.getStyledDocument();
 
+    // Users List
     listModel = new DefaultListModel<>();
     userList = new JList<>(listModel);
+    userList.setBackground(INPUT_BG);
+    userList.setForeground(TEXT_COLOR);
+    userList.setSelectionBackground(OTHER_MSG_COLOR);
     userList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-    userList.setBorder(BorderFactory.createTitledBorder("Online Users"));
-    userList.setPreferredSize(new Dimension(150, 0));
+    userList.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(SYSTEM_MSG_COLOR),
+        "Online Users", 0, 0, null, SYSTEM_MSG_COLOR));
+    userList.setPreferredSize(new Dimension(180, 0));
 
-    inputField = new JTextField();
-    inputField.setFont(new Font("SansSerif", Font.PLAIN, 14));
+    // Input Field
+    inputField = new JTextArea(1, 25);
+    inputField.setLineWrap(true);
+    inputField.setWrapStyleWord(true);
+    inputField.setBackground(INPUT_BG);
+    inputField.setForeground(TEXT_COLOR);
+    inputField.setCaretColor(TEXT_COLOR);
+    inputField.setBorder(new EmptyBorder(5, 5, 5, 5));
 
+    // Input Behavior: Enter to send, Shift+Enter for new line
+    inputField.addKeyListener(new KeyAdapter() {
+    @Override
+    public void keyPressed(KeyEvent e) {
+    if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+    if (e.isShiftDown()) {
+    inputField.append("\n");
+    } else {
+    e.consume();
+    sendMessage();
+    }
+    }
+    }
+    });
+
+    // Buttons Logic
     Icon msgIcon = new FlatSVGIcon("icons/msgIcon.svg", 16, 16);
-    sendBtn = new JButton("Send" , msgIcon);
-    
+    sendBtn = new JButton("Send", msgIcon);
+
     Icon fileIcon = new FlatSVGIcon("icons/fileIcon.svg", 16, 16);
     fileBtn = new JButton("", fileIcon);
 
@@ -72,6 +115,29 @@ public class ChatFrame extends JFrame {
     add(new JScrollPane(chatPane), BorderLayout.CENTER);
     add(new JScrollPane(userList), BorderLayout.EAST);
     add(bottom, BorderLayout.SOUTH);
+
+    // Status Bar
+    statusLabel = new JLabel("Connecting...");
+    statusLabel.setForeground(SYSTEM_MSG_COLOR);
+    statusLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
+
+    // Layout
+    JPanel bottomPanel = new JPanel(new BorderLayout(5, 5));
+    bottomPanel.setBackground(BG_COLOR);
+    bottomPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+    JPanel buttonPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+    buttonPanel.setBackground(BG_COLOR);
+    buttonPanel.add(fileBtn);
+    buttonPanel.add(sendBtn);
+
+    bottomPanel.add(new JScrollPane(inputField), BorderLayout.CENTER);
+    bottomPanel.add(buttonPanel, BorderLayout.EAST);
+
+    add(new JScrollPane(chatPane), BorderLayout.CENTER);
+    add(userList, BorderLayout.EAST);
+    add(bottomPanel, BorderLayout.SOUTH);
+    add(statusLabel, BorderLayout.NORTH);
 
     sendBtn.addActionListener(e -> sendMessage());
     fileBtn.addActionListener(e -> sendFile());
@@ -89,7 +155,68 @@ public class ChatFrame extends JFrame {
       }
     });
 
+    // Focus management
+    addWindowListener(new WindowAdapter() {
+      public void windowOpened(WindowEvent e) {
+        inputField.requestFocus();
+      }
+    });
+
     setVisible(true);
+  }
+
+  private void appendMessage(String sender, String content, Color color, int alignment) {
+    SwingUtilities.invokeLater(() -> {
+      try {
+        String timestamp = "[" + timeFormat.format(new Date()) + "] ";
+
+        // Set Alignment
+        SimpleAttributeSet alignAttr = new SimpleAttributeSet();
+        StyleConstants.setAlignment(alignAttr, alignment);
+        int start = doc.getLength();
+
+        // Timestamp Style
+        SimpleAttributeSet timeAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(timeAttr, SYSTEM_MSG_COLOR);
+        StyleConstants.setItalic(timeAttr, true);
+        doc.insertString(doc.getLength(), timestamp, timeAttr);
+
+        // Sender Style
+        SimpleAttributeSet senderAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(senderAttr, color);
+        StyleConstants.setBold(senderAttr, true);
+        doc.insertString(doc.getLength(), sender + ": ", senderAttr);
+
+        // Content Style
+        SimpleAttributeSet contentAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(contentAttr, TEXT_COLOR);
+        doc.insertString(doc.getLength(), content + "\n", contentAttr);
+
+        doc.setParagraphAttributes(start, doc.getLength() - start, alignAttr, false);
+        chatPane.setCaretPosition(doc.getLength());
+      } catch (BadLocationException e) {
+        e.printStackTrace();
+      }
+    });
+  }
+
+  private void appendSystemMessage(String content) {
+    SwingUtilities.invokeLater(() -> {
+      try {
+        SimpleAttributeSet alignAttr = new SimpleAttributeSet();
+        StyleConstants.setAlignment(alignAttr, StyleConstants.ALIGN_CENTER);
+        int start = doc.getLength();
+
+        SimpleAttributeSet sysAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(sysAttr, SYSTEM_MSG_COLOR);
+        StyleConstants.setItalic(sysAttr, true);
+        doc.insertString(doc.getLength(), "— " + content + " —\n", sysAttr);
+
+        doc.setParagraphAttributes(start, doc.getLength() - start, alignAttr, false);
+      } catch (BadLocationException e) {
+        e.printStackTrace();
+      }
+    });
   }
 
   private void appendText(String text, Color color, boolean bold) {
@@ -104,8 +231,15 @@ public class ChatFrame extends JFrame {
   }
 
   private void appendImage(byte[] imageData, String sender) {
-    appendText(sender + " sent an image:", Color.BLUE, true);
+    if (sender == "Me") {
+      appendMessage(sender, sender + " sent an image:", MY_MSG_COLOR, StyleConstants.ALIGN_RIGHT);
+    }
+    else {
+      appendMessage(sender, sender + " sent an image:", MY_MSG_COLOR, StyleConstants.ALIGN_LEFT);
+    }
+    
     ImageIcon icon = new ImageIcon(imageData);
+
     // Reduce the image size if it is too large.
     Image img = icon.getImage();
     int width = img.getWidth(null);
@@ -118,6 +252,7 @@ public class ChatFrame extends JFrame {
 
     chatPane.setCaretPosition(doc.getLength());
     chatPane.insertIcon(icon);
+    
     try {
       doc.insertString(doc.getLength(), "\n", null);
     } catch (BadLocationException e) {
@@ -126,28 +261,31 @@ public class ChatFrame extends JFrame {
   }
 
   private void connectToServer(String host, int port) {
-    try {
-      Socket socket = new Socket(host, port);
-      out = new ObjectOutputStream(socket.getOutputStream());
-      in = new ObjectInputStream(socket.getInputStream());
+    new Thread(() -> {
+      try {
+        Socket socket = new Socket(host, port);
+        out = new ObjectOutputStream(socket.getOutputStream());
+        in = new ObjectInputStream(socket.getInputStream());
 
-      out.writeObject(new ChatMessage(ChatMessage.MessageType.TEXT, username, "Login"));
+        out.writeObject(new ChatMessage(ChatMessage.MessageType.TEXT, username, "Login"));
 
-      new Thread(() -> {
-        try {
-          while (true) {
-            ChatMessage msg = (ChatMessage) in.readObject();
-            handleIncomingMessage(msg);
-          }
-        } catch (Exception e) {
-          appendText("Disconnected from server.", Color.RED, true);
+        SwingUtilities.invokeLater(() -> {
+          statusLabel.setText("Connected as " + username);
+          statusLabel.setForeground(MY_MSG_COLOR);
+        });
+
+        while (true) {
+          ChatMessage msg = (ChatMessage) in.readObject();
+          handleIncomingMessage(msg);
         }
-      }).start();
-    } catch (IOException e) {
-      JOptionPane.showMessageDialog(this, "Could not connect to server: " + e.getMessage(), "Error",
-          JOptionPane.ERROR_MESSAGE);
-      System.exit(1);
-    }
+      } catch (Exception e) {
+        SwingUtilities.invokeLater(() -> {
+          statusLabel.setText("Disconnected from server.");
+          statusLabel.setForeground(Color.RED);
+        });
+        appendSystemMessage("Connection lost.");
+      }
+    }).start();
   }
 
   private void handleIncomingMessage(ChatMessage msg) {
@@ -164,6 +302,7 @@ public class ChatFrame extends JFrame {
       if (fileName.endsWith(".jpg") || fileName.endsWith(".png") || fileName.endsWith(".gif")
           || fileName.endsWith(".jpeg")) {
         SwingUtilities.invokeLater(() -> appendImage(msg.getFileData(), msg.getSender()));
+        
       } else {
         SwingUtilities.invokeLater(() -> {
           appendText(msg.getSender() + " sent a file: " + msg.getFileName(), Color.MAGENTA, true);
@@ -191,8 +330,9 @@ public class ChatFrame extends JFrame {
 
     try {
       out.writeObject(msg);
-      appendText("Me: " + msg.getContent(), Color.WHITE, false);
+      appendMessage("Me", text, MY_MSG_COLOR, StyleConstants.ALIGN_RIGHT);
       inputField.setText("");
+      inputField.requestFocus();
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -220,7 +360,8 @@ public class ChatFrame extends JFrame {
             || fileName.endsWith(".jpeg")) {
           appendImage(data, "Me");
         } else {
-          appendText("Me: Sent file " + file.getName(), Color.lightGray, false);
+          appendMessage("Me", file.getName(), Color.lightGray, StyleConstants.ALIGN_RIGHT);
+          // appendText("Me: Sent file " + file.getName(), Color.lightGray, false);
         }
       } catch (IOException e) {
         e.printStackTrace();
