@@ -14,7 +14,7 @@ The system supports **real-time messaging**, **private messages**, **file sharin
 ## Screenshots
 ![Project Screenshot](./screenshot/login.png)
 ![Project Screenshot](./screenshot/newConn.png)
-![Project Screenshot](./screenshot/sendImage.png)
+![Project Screenshot](./screenshot/sendIamge.png)
 ---
 
 ## Features
