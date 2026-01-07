@@ -1,6 +1,6 @@
 # Multi-threaded Chat Application
 
-A simple yet powerful **multi-user chat application** built in **Java 23** with a modern Swing UI. This project demonstrates real-time communication between multiple clients through a multi-threaded server architecture, includes private messaging, file sharing, image previews, and a dark theme user interface.
+A simple yet powerful **multi-user chat application** built in **Java 21** with a modern Swing UI. This project demonstrates real-time communication between multiple clients through a multi-threaded server architecture, includes private messaging, file sharing, image previews, and a dark theme user interface.
 
 ---
 
@@ -27,7 +27,7 @@ The system supports **real-time messaging**, **private messages**, **file sharin
 
 ## Tech Stack
 
-* **Java 23** – Core language for both server and client.
+* **Java 21** – Core language for both server and client.
 * **Swing** – Graphical user interface framework.
 * **FlatLaf** – Modern dark theme for Swing applications.
 * **Maven** – Dependency and build management.
