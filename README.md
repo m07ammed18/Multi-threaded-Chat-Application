@@ -10,6 +10,11 @@ This application is a desktop-based chat system with a centralized server handli
 
 The system supports **real-time messaging**, **private messages**, **file sharing**, **online user list**, and **system notifications** for user actions.
 
+
+## Screenshots
+![Project Screenshot](./screenshot/login.png)
+![Project Screenshot](./screenshot/newConn.png)
+![Project Screenshot](./screenshot/sendImage.png)
 ---
 
 ## Features
