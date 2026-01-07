@@ -135,5 +135,7 @@ Multi-threaded-Chat-Application/
 ```
 
 ---
+# Acknowledgements
 
+This project demonstrates practical application of socket programming, multi-threading, and desktop UI development using Java. It is suitable as a portfolio project or as an educational reference for real-time networked applications. 
 
