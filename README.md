@@ -129,7 +129,7 @@ Multi-threaded-Chat-Application/
 │   │   │   ├── com.chatapp.server/
 │   │   │   ├── com.chatapp.client/
 │   │   │   ├── com.chatapp.ui/
-│   │   │   └── resources/
+│   │   │   └── resources/icons
 ├── pom.xml
 └── README.md
 ```
